@@ -4,31 +4,28 @@ Quirkle Game — Jakarta WAR + SPA client.
 
 ## Current release
 
-**v0.19.0** (2026-08-05) — Client UX polish (release 19)
+**v0.20.0** (2026-08-05) — Achievements (Quirklapalooza, IT Nerd, Sprawler), completed-games API, manual delete, client UX.
 
-See [RELEASE-v0.19.0.md](RELEASE-v0.19.0.md).
+See [RELEASE-v0.20.0.md](RELEASE-v0.20.0.md).
 
-Deployable tree: `quirkle-v0.19.0/`  
-WAR: build with `jar cf quirkle.war -C quirkle-v0.19.0 .`
+Source base: `quirkle-v0.18.0-src-20260803.tar.gz` + changes under `quirkle-v0.20.0/`.
+
+```bash
+# Apply v0.20.0 file overlays onto the extracted 0.18 source, then:
+./build.sh
+```
 
 ## ReqSuite backlog (Epic E014)
-
-Full **delivered** and **planned** feature board, plus defects:
 
 | Doc | Link |
 |-----|------|
 | Board index | [reqsuite/E014-BOARD.md](reqsuite/E014-BOARD.md) |
-| Delivered features | [reqsuite/E014-DELIVERED.md](reqsuite/E014-DELIVERED.md) |
-| Planned features | [reqsuite/E014-PLANNED.md](reqsuite/E014-PLANNED.md) |
+| Delivered | [reqsuite/E014-DELIVERED.md](reqsuite/E014-DELIVERED.md) |
+| Planned | [reqsuite/E014-PLANNED.md](reqsuite/E014-PLANNED.md) |
 | Defects | [reqsuite/E014-DEFECTS.md](reqsuite/E014-DEFECTS.md) |
-| JSON snapshot | [reqsuite/E014-board.json](reqsuite/E014-board.json) |
-| Import payload (v0.19.0) | [reqsuite-E014-v0.19.0.json](reqsuite-E014-v0.19.0.json) |
-| GitHub issues map | [ISSUES.md](ISSUES.md) |
+| v0.20 notes | [reqsuite/E014-v0.20.0-NOTES.md](reqsuite/E014-v0.20.0-NOTES.md) |
 
-## Note on source
+## Source
 
-This repository currently ships the **deployable WAR contents** (compiled classes + `index.html`). Java sources are not included; server-side feature work requires the source tree.
-
-## Previous
-
-- `quirkle-v0.18.0/` — prior deployable tree
+- [quirkle-v0.18.0-src-20260803.tar.gz](quirkle-v0.18.0-src-20260803.tar.gz) — base tree
+- `quirkle-v0.20.0/` — overlay sources for this release
