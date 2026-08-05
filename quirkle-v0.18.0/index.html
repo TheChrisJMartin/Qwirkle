@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Qwirkle</title>
+<style>
+  :root{
+    --bar:120px;
+    --felt:#1f3d34;--felt2:#12241f;
+    --tile:#15151a;--tile2:#26262e;
+    --ink:#f3efe6;--muted:#9fb3aa;--line:#2c4a41;--slot:#3a6156;--accent:#e5b93c;
+    --r:#d0453f;--o:#e07a2f;--y:#e5b93c;--g:#3f9d54;--b:#3d78b5;--p:#8a4fa3;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none}
+  body{font-family:"Iowan Old Style",Palatino,Georgia,serif;color:var(--ink);
+    background:radial-gradient(130% 100% at 50% 0%,var(--felt),var(--felt2));height:100dvh}
+
+  /* board viewport */
+  #viewport{position:fixed;left:0;right:0;top:0;bottom:var(--bar);overflow:hidden;
+    touch-action:none;transition:filter .2s}
+  #viewport.blur{filter:blur(6px) brightness(.7)}
+  #boardInner{position:relative;transform-origin:0 0;width:0;height:0}
+  .tile,.slot{position:absolute;width:46px;height:46px}
+  .tile .face{width:100%;height:100%;border-radius:8px;
+    background:linear-gradient(160deg,var(--tile2),var(--tile));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 2px 5px rgba(0,0,0,.5);
+    display:flex;align-items:center;justify-content:center}
+  .tile.pending .face{outline:2px solid var(--accent);outline-offset:-2px}
+  .glyph{width:74%;height:74%;display:block}
+  .slot{padding:6px;cursor:pointer}
+  .slot .drop{width:100%;height:100%;border-radius:8px;border:1.5px dashed var(--slot);
+    background:rgba(255,255,255,.03)}
+  .slot:active .drop{background:rgba(229,185,60,.22)}
+
+  /* status pill + hint */
+  #status{position:fixed;top:12px;left:62px;z-index:5;background:rgba(0,0,0,.4);
+    border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:13px;letter-spacing:.02em}
+  #hint{position:fixed;top:10px;right:10px;z-index:5;font-size:11px;color:var(--muted);
+    background:rgba(0,0,0,.35);padding:5px 10px;border-radius:999px}
+
+  /* toaster */
+  #toast{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-10px);z-index:30;
+    background:rgba(12,22,18,.94);border:1px solid var(--line);border-radius:12px;padding:9px 14px;
+    display:flex;align-items:center;gap:9px;font-size:15px;opacity:0;transition:opacity .25s,transform .25s;
+    pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:92vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast .pts{color:var(--accent);font-weight:700}
+  .mini{width:22px;height:22px;border-radius:5px;background:linear-gradient(160deg,var(--tile2),var(--tile));
+    display:inline-flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .mini svg{width:15px;height:15px}
+
+  /* bottom bar */
+  #bar{position:fixed;left:0;right:0;bottom:0;height:var(--bar);z-index:10;
+    background:linear-gradient(180deg,rgba(10,20,17,.6),rgba(8,16,13,.96));
+    border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;gap:8px;justify-content:center}
+  #rack{display:flex;gap:7px;justify-content:center}
+  #rack .tile{position:static;width:46px;height:46px;cursor:pointer;transition:transform .08s}
+  #rack .tile.sel{transform:translateY(-6px)}
+  #rack .tile.sel .face{outline:2px solid var(--accent);outline-offset:-2px}
+  #rack .tile.swap .face{outline:2px solid var(--b);outline-offset:-2px}
+  #rack .empty{width:46px;height:46px;border-radius:8px;border:1px dashed var(--line);opacity:.45}
+  #btns{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+  #btns button{font:inherit;font-size:14px;padding:8px 12px;border-radius:9px;border:1px solid var(--line);
+    background:#23433a;color:var(--ink);cursor:pointer;min-width:56px}
+  #btns button:active{transform:translateY(1px)}
+  #btns button.primary{background:var(--accent);color:#2a2410;border-color:transparent;font-weight:700}
+  #btns button:disabled{opacity:.38}
+
+  /* modal */
+  #modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:16px;
+    background:rgba(6,12,10,.55)}
+  #modal.on{display:flex}
+  .sheet{background:linear-gradient(160deg,#20423a,#12241f);border:1px solid var(--line);border-radius:16px;
+    width:100%;max-width:440px;max-height:86dvh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .sheet header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;
+    border-bottom:1px solid var(--line);flex-shrink:0}
+  .sheet header h2{margin:0;font-size:20px;font-weight:600}
+  .sheet .x{background:none;border:0;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;padding:0 4px}
+  .sheet .body{padding:16px 18px;overflow:auto;flex:1;min-height:0}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .row:last-child{border-bottom:0}
+  .row .who{display:flex;align-items:center;gap:8px}
+  .num{font-variant-numeric:tabular-nums}
+  .big{font-size:26px;font-weight:700}
+  .cap{color:var(--muted);font-size:12px;margin:2px 0 12px}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .stat{background:rgba(0,0,0,.2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .stat .k{color:var(--muted);font-size:12px}
+  .stat .v{font-size:20px;font-weight:700;margin-top:3px}
+  .logline{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);flex-wrap:wrap}
+  .logline .nm{min-width:64px;color:var(--muted);font-size:13px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}
+  .seg{display:flex;gap:6px}
+  .seg button{flex:1;font:inherit;padding:9px;border-radius:9px;border:1px solid var(--line);background:#23433a;color:var(--ink);cursor:pointer}
+  .seg button.on{background:var(--accent);color:#2a2410;border-color:transparent;font-weight:700}
+  input[type=text]{width:100%;font:inherit;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink)}
+  .start{width:100%;font:inherit;font-size:16px;padding:12px;border-radius:10px;border:0;background:var(--accent);color:#2a2410;font-weight:700;cursor:pointer;margin-top:4px}
+  .err{background:#4a2320;border:1px solid #7d3a34;color:#f2c9c4;border-radius:9px;padding:10px;margin-top:12px;font-size:14px;display:none}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+  .dot.turn{background:var(--accent);box-shadow:0 0 0 3px rgba(229,185,60,.25)}
+  #bPlay.flashok{background:#3f9d54;color:#08130b;border-color:transparent;animation:pg 1s infinite}
+  #bReset.flashbad{border-color:#d0453f;color:#f2c9c4;animation:pr 1s infinite}
+  @keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(63,157,84,0)}50%{box-shadow:0 0 0 4px rgba(63,157,84,.65)}}
+  @keyframes pr{0%,100%{box-shadow:0 0 0 0 rgba(208,69,63,0)}50%{box-shadow:0 0 0 4px rgba(208,69,63,.6)}}
+  .tile.r1 .face{outline:2px solid #ffffff;outline-offset:-2px}
+  .tile.r2 .face{outline:2px solid #b3bdb8;outline-offset:-2px}
+  .tile.r3 .face{outline:2px solid #66716b;outline-offset:-2px}
+  #mSub{color:var(--muted);font-size:12px;margin-top:2px}
+  .waiting{font-size:14px;color:var(--accent)}
+  .qbadge{background:var(--accent);color:#2a2410;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;letter-spacing:.05em}
+  .pts{color:var(--accent);font-weight:700}
+  .started b{color:var(--muted);letter-spacing:.12em;font-size:12px}
+  .prow{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .prow:last-child{border-bottom:0}
+  .pn{font-size:15px;margin-bottom:3px}
+  .pd{color:var(--muted);font-size:12px;line-height:1.5}
+  .tabbar{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+  .tabbar button{flex:1;background:none;border:none;color:var(--muted);padding:9px 4px;font-size:13px;border-bottom:2px solid transparent;cursor:pointer}
+  .tabbar button.on{color:var(--fg);border-bottom-color:var(--accent)}
+  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.stbl{width:100%;border-collapse:collapse;font-size:12px}
+  table.stbl th,table.stbl td{padding:6px 5px;text-align:right;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+  table.stbl th:first-child,table.stbl td:first-child{text-align:left}
+  table.stbl th{color:var(--muted);font-weight:600;font-size:11px}
+  .achgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+  .ach{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+  .ach.lock{opacity:.42}
+  .ach .an{font-size:13px;font-weight:600}
+  .ach .ad{color:var(--muted);font-size:11px;line-height:1.4;margin-top:2px}
+  .ach .pips{color:var(--accent);font-size:10px;letter-spacing:1px;margin-top:5px}
+  .ach.soon .an::after{content:' · soon';color:var(--muted);font-weight:400;font-size:10px}
+  .acct{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:11px;margin-bottom:14px;font-size:13px}
+  .acct .lnk{color:var(--accent);cursor:pointer}
+  .authrow{display:flex;gap:6px;margin-top:8px}
+  .authrow input{flex:1;background:#12241f;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px}
+  .authrow button{flex:1;background:#1a332c;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px;font-size:13px;cursor:pointer}
+  .persona{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .persona .pnm{width:58px;font-size:13px;color:var(--fg)}
+  .persona select{flex:1;background:#12241f;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px}
+  #toast .ach2{color:var(--accent);font-weight:700}
+  #burger{position:fixed;top:10px;left:10px;z-index:14;width:42px;height:42px;border-radius:11px;border:1px solid var(--line);background:rgba(0,0,0,.5);color:var(--fg);font-size:19px;display:none;align-items:center;justify-content:center;cursor:pointer}
+  #burger.show{display:flex}
+  #menu{position:fixed;top:58px;left:10px;z-index:14;background:linear-gradient(160deg,#20423a,#12241f);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 50px rgba(0,0,0,.6);min-width:180px;display:none;overflow:hidden}
+  #menu.on{display:block}
+  #menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--fg);padding:13px 16px;font:inherit;font-size:14px;cursor:pointer}
+  #menu button:active{background:rgba(255,255,255,.06)}
+  #menu .sep{height:1px;background:var(--line)}
+  button.ghost{width:100%;margin-top:9px;background:#1a332c;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:14px;cursor:pointer}
+  .linkrow{margin-top:12px;text-align:center}
+  .ok{display:none;color:#7fd39a;font-size:13px;margin-top:11px}
+  .achwhen{color:var(--accent);font-size:10px;margin-top:3px}
+  #toast.qwirkle{background:#0a0f0d;border:1px solid #e5b93c;box-shadow:0 0 22px rgba(229,185,60,.45);padding:12px 18px}
+  .qwletters span{font-weight:800;font-size:19px;letter-spacing:1px}
+  .winner{font-size:20px;font-weight:700;color:var(--accent);text-align:center;margin:2px 0 14px}
+  .lvlsel{width:100%;background:#12241f;color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:9px;font:inherit}
+  .ach.fresh{border-color:#3f9d54;box-shadow:0 0 0 1px #3f9d54 inset,0 0 14px rgba(63,157,84,.28)}
+  .ach .newbadge{display:inline-block;background:#3f9d54;color:#08130b;font-size:9px;font-weight:800;padding:1px 5px;border-radius:5px;margin-left:6px;vertical-align:middle;letter-spacing:.05em}
+  .netrow{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer;background:rgba(255,255,255,0.02)}
+  .netrow b{color:var(--fg)}
+  @keyframes pulseY{0%,100%{box-shadow:0 0 0 0 rgba(229,185,60,0)}50%{box-shadow:0 0 0 3px rgba(229,185,60,.55)}}
+  @keyframes pulseG{0%,100%{box-shadow:0 0 0 0 rgba(63,157,84,0)}50%{box-shadow:0 0 0 3px rgba(63,157,84,.6)}}
+  @keyframes pulseR{0%,100%{box-shadow:0 0 0 0 rgba(199,75,63,0)}50%{box-shadow:0 0 0 3px rgba(199,75,63,.6)}}
+  #bPlay.flashturn{background:#e5b93c;color:#2a2410;animation:pulseY 1.1s ease-in-out infinite}
+  #bPlay.flashok{background:#3f9d54;color:#08130b;animation:pulseG .9s ease-in-out infinite}
+  #bReset.flashbad{background:#c74b3f;color:#fff;animation:pulseR .9s ease-in-out infinite}
+  .tile.illegal{outline:3px solid #e5533f;outline-offset:-1px;box-shadow:0 0 8px rgba(229,83,63,.7);border-radius:5px}
+  #scores{position:fixed;bottom:calc(var(--bar) + 8px);right:8px;z-index:25;background:rgba(12,26,22,.82);border:1px solid var(--line);border-radius:9px;padding:4px 8px;font-size:10.5px;color:#8fa39b;min-width:86px;max-width:40vw;backdrop-filter:blur(3px);line-height:1.32}
+  #scores .row{display:flex;justify-content:space-between;gap:9px;white-space:nowrap}
+  #scores .row.cur{color:var(--accent)}
+  #scores .row .nm{overflow:hidden;text-overflow:ellipsis;max-width:22vw}
+  #scores .row .sc{font-weight:700;color:var(--fg)} #scores .row.cur .sc{color:var(--accent)}
+  #scores .row .tl{opacity:.5;margin-left:6px;font-weight:400}
+  #bag{position:fixed;bottom:calc(var(--bar) + 8px);left:8px;z-index:25;display:flex;align-items:center;gap:5px;background:rgba(12,26,22,.82);border:1px solid var(--line);border-radius:9px;padding:3px 8px;font-size:12px;font-weight:700;color:var(--fg);backdrop-filter:blur(3px)}
+  #bag svg{display:block}
+  .about h3.ab{font-size:13px;color:var(--fg);margin:16px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  .about h3.ab:first-child{margin-top:0}
+  .about .abrow{margin:7px 0} .about .abrow b{color:var(--fg)}
+  .about .pips{letter-spacing:1px;color:#3a5049;font-size:10px} .about .pips .on{color:var(--accent)}
+</style>
+</head>
+<body>
+  <div id="viewport"><div id="boardInner"></div></div>
+  <div id="toast"></div>
+  <div id="scores"></div>
+  <div id="bag"></div>
+
+  <button id="burger">&#9776;</button>
+  <div id="menu">
+    <button data-a="log">Game log</button>
+    <button data-a="scores">Scores</button>
+    <button data-a="stats">Stats</button>
+    <button data-a="ach">Achievements</button>
+    <button data-a="new">New game</button>
+    <button data-a="online">My games</button>
+    <button data-a="about">About &amp; help</button>
+    <div class="sep"></div>
+    <button data-a="quit">Quit game</button>
+  </div>
+
+  <div id="bar">
+    <div id="rack"></div>
+    <div id="btns">
+      <button class="primary" id="bPlay">Play</button>
+      <button id="bSwap">Swap</button>
+      <button id="bReset">Reset</button>
+    </div>
+  </div>
+
+  <div id="modal"><div class="sheet"><header><div><h2 id="mTitle"></h2><div id="mSub"></div></div><button class="x" id="mClose">&times;</button></header><div class="body" id="mBody"></div></div></div>
+
+<script>
+const CELL=46;
+const COL={r:'var(--r)',o:'var(--o)',y:'var(--y)',g:'var(--g)',b:'var(--b)',p:'var(--p)'};
+let S=null, pending=[], selRack=null, swapMode=false, swapSel=new Set(), botsRunning=false;
+let thinkTimes=[], humanTurnStart=null;
+let currentUser=null;
+let busy=false, rosterPick=[];
+let lastPlace={x:null,y:null,t:0}, lastPickWarn=0;
+let statTab='game', unlockedThisGame=0, lastGameUnlocks=new Set();
+let netGame=false, pendingJoin=null, netBots=1, netDiff='medium', netWs=null, netSeen=0, netPoll=null;
+let view={tx:0,ty:0,s:1};
+
+/* ---------- glyphs ---------- */
+function starPts(cx,cy,sp,o,i){let p=[],rot=-Math.PI/2,st=Math.PI/sp;for(let k=0;k<sp*2;k++){let r=(k%2===0)?o:i,a=rot+k*st;p.push((cx+Math.cos(a)*r).toFixed(1)+','+(cy+Math.sin(a)*r).toFixed(1));}return p.join(' ');}
+function shapeSvg(sh,f){switch(sh){
+  case 'c':return `<circle cx="50" cy="50" r="30" fill="${f}"/>`;
+  case 'q':return `<rect x="22" y="22" width="56" height="56" rx="7" fill="${f}"/>`;
+  case 'd':return `<polygon points="50,14 86,50 50,86 14,50" fill="${f}"/>`;
+  case 'l':return `<g fill="${f}"><circle cx="50" cy="33" r="17"/><circle cx="67" cy="50" r="17"/><circle cx="50" cy="67" r="17"/><circle cx="33" cy="50" r="17"/><circle cx="50" cy="50" r="15"/></g>`;
+  case 'x':return `<polygon points="50,13 61,39 87,50 61,61 50,87 39,61 13,50 39,39" fill="${f}"/>`;
+  case 'e':return `<polygon points="${starPts(50,50,8,37,15)}" fill="${f}"/>`;}return '';}
+function glyph(code){return `<svg class="glyph" viewBox="0 0 100 100">${shapeSvg(code[1],COL[code[0]]||'#fff')}</svg>`;}
+function face(code){return `<div class="face">${glyph(code)}</div>`;}
+function mini(code){return `<span class="mini"><svg viewBox="0 0 100 100">${shapeSvg(code[1],COL[code[0]]||'#fff')}</svg></span>`;}
+function miniRow(codes){return codes.map(mini).join('');}
+
+/* ---------- api ---------- */
+async function api(path,method,body){
+  const o={method};
+  if(body){o.headers={'Content-Type':'application/x-www-form-urlencoded'};o.body=new URLSearchParams(body).toString();}
+  const r=await fetch(path,o); let d; try{d=await r.json();}catch(e){d={error:'Unexpected response.'};}
+  if(!r.ok) throw new Error(d.error||('Request failed ('+r.status+').')); return d;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- geometry / view ---------- */
+function occMap(){const m=new Map();if(S){S.board.forEach(t=>m.set(t.x+','+t.y,t.t));}pending.forEach(p=>m.set(p.x+','+p.y,p.code));return m;}
+function anchors(occ){if(occ.size===0)return new Set(['0,0']);const a=new Set();
+  for(const k of occ.keys()){const[x,y]=k.split(',').map(Number);[[1,0],[-1,0],[0,1],[0,-1]].forEach(d=>{const nk=(x+d[0])+','+(y+d[1]);if(!occ.has(nk))a.add(nk);});}return a;}
+function allowed(anch){if(pending.length===0)return anch;const out=new Set();
+  anch.forEach(k=>{const[x,y]=k.split(',').map(Number);const cs=pending.concat([{x,y}]);
+    if(cs.every(c=>c.x===cs[0].x)||cs.every(c=>c.y===cs[0].y))out.add(k);});return out;}
+function lastMoveRanks(){const m=new Map();if(!S||!S.events)return m;
+  const mv=S.events.filter(e=>e.kind==='MOVE').slice(-3);
+  mv.forEach((e,idx)=>{const rank=mv.length-idx;(e.cells||[]).forEach(c=>m.set(c.x+','+c.y,rank));});return m;}
+function validatePending(){
+  if(pending.length===0)return{empty:true,legal:false,points:0};
+  const board=new Map();S.board.forEach(t=>board.set(t.x+','+t.y,t.t));
+  const temp=new Map(board);pending.forEach(p=>temp.set(p.x+','+p.y,p.code));
+  const first=board.size===0, single=pending.length===1;
+  const has=(x,y)=>temp.has(x+','+y);
+  let axis=null;
+  if(!single){const sx=pending.every(p=>p.x===pending[0].x),sy=pending.every(p=>p.y===pending[0].y);
+    if(sy)axis='h';else if(sx)axis='v';else return{legal:false,points:0};
+    if(axis==='h'){const y=pending[0].y,xs=pending.map(p=>p.x),lo=Math.min(...xs),hi=Math.max(...xs);for(let x=lo;x<=hi;x++)if(!has(x,y))return{legal:false,points:0};}
+    else{const x=pending[0].x,ys=pending.map(p=>p.y),lo=Math.min(...ys),hi=Math.max(...ys);for(let y=lo;y<=hi;y++)if(!has(x,y))return{legal:false,points:0};}}
+  if(!first){const conn=pending.some(p=>[[1,0],[-1,0],[0,1],[0,-1]].some(d=>board.has((p.x+d[0])+','+(p.y+d[1]))));if(!conn)return{legal:false,points:0};}
+  function run(x,y,dir){const dx=dir==='h'?1:0,dy=dir==='h'?0:1;let sx=x,sy=y;
+    while(has(sx-dx,sy-dy)){sx-=dx;sy-=dy;}const arr=[];let ex=sx,ey=sy;
+    while(has(ex,ey)){arr.push(temp.get(ex+','+ey));ex+=dx;ey+=dy;}return arr;}
+  const seen=new Set(),lines=[];
+  function addLine(x,y,dir){const arr=run(x,y,dir);if(arr.length<1)return;
+    let sx=x,sy=y;const dx=dir==='h'?1:0,dy=dir==='h'?0:1;while(has(sx-dx,sy-dy)){sx-=dx;sy-=dy;}
+    const key=dir+sx+','+sy;if(seen.has(key))return;seen.add(key);lines.push(arr);}
+  if(single){addLine(pending[0].x,pending[0].y,'h');addLine(pending[0].x,pending[0].y,'v');}
+  else{addLine(pending[0].x,pending[0].y,axis);pending.forEach(p=>addLine(p.x,p.y,axis==='h'?'v':'h'));}
+  let points=0,scoring=0;
+  for(const arr of lines){if(arr.length<2)continue;if(arr.length>6)return{legal:false,points:0};
+    if(new Set(arr).size!==arr.length)return{legal:false,points:0};
+    const sameC=arr.every(c=>c[0]===arr[0][0]),sameS=arr.every(c=>c[1]===arr[0][1]);
+    if(!sameC&&!sameS)return{legal:false,points:0};
+    points+=arr.length;if(arr.length===6)points+=6;scoring++;}
+  if(scoring===0)points=pending.length;
+  return{legal:true,points,empty:false};}
+function applyView(){document.getElementById('boardInner').style.transform=`translate(${view.tx}px,${view.ty}px) scale(${view.s})`;}
+function contentBounds(){const occ=occMap();let xs=[],ys=[];occ.forEach((v,k)=>{const[x,y]=k.split(',').map(Number);xs.push(x);ys.push(y);});
+  if(xs.length===0)return{minX:-1,maxX:1,minY:-1,maxY:1};
+  return{minX:Math.min(...xs)-1,maxX:Math.max(...xs)+1,minY:Math.min(...ys)-1,maxY:Math.max(...ys)+1};}
+function fitBoard(){const vp=document.getElementById('viewport');const b=contentBounds();
+  const iw=(b.maxX-b.minX+1)*CELL, ih=(b.maxY-b.minY+1)*CELL;
+  let s=Math.min(vp.clientWidth/iw, vp.clientHeight/ih); s=Math.max(.35,Math.min(1.4,s*0.92));
+  view.s=s; view.tx=(vp.clientWidth-iw*s)/2 - b.minX*CELL*s; view.ty=(vp.clientHeight-ih*s)/2 - b.minY*CELL*s; applyView();}
+
+/* ---------- render ---------- */
+function render(){
+  if(S){if(S.status==='IN_PROGRESS'&&S.current===S.yourSeat&&!botsRunning){if(humanTurnStart===null)humanTurnStart=Date.now();}else humanTurnStart=null;}
+  updateChrome();
+  const inner=document.getElementById('boardInner'); inner.innerHTML='';
+  const occ=occMap(); const cellRank=lastMoveRanks();
+  for(const[k,code] of occ){const[x,y]=k.split(',').map(Number);
+    const pend=pending.some(p=>p.x===x&&p.y===y);
+    let cls='tile'+(pend?' pending':'');if(!pend&&cellRank.has(k))cls+=' r'+cellRank.get(k);
+    const d=document.createElement('div');d.className=cls;
+    d.style.left=(x*CELL)+'px';d.style.top=(y*CELL)+'px';d.innerHTML=face(code);inner.appendChild(d);}
+  const interactive=S&&S.status==='IN_PROGRESS'&&S.current===S.yourSeat&&!botsRunning&&!swapMode;
+  if(interactive){allowed(anchors(occ)).forEach(k=>{if(occ.has(k))return;const[x,y]=k.split(',').map(Number);
+    const s=document.createElement('div');s.className='slot';s.style.left=(x*CELL)+'px';s.style.top=(y*CELL)+'px';
+    s.dataset.x=x;s.dataset.y=y;
+    s.innerHTML='<div class="drop"></div>';s.onclick=()=>placeAt(x,y);inner.appendChild(s);});}
+  renderScores(); renderRack(); renderControls();
+}
+function renderRack(){const r=document.getElementById('rack');r.innerHTML='';if(!S)return;
+  S.hand.forEach((code,i)=>{
+    if(pending.some(p=>p.rackIdx===i)){const e=document.createElement('div');e.className='empty';r.appendChild(e);return;}
+    const d=document.createElement('div');d.className='tile'+(selRack===i?' sel':'')+(swapSel.has(i)?' swap':'');
+    d.innerHTML=face(code);
+    d.onclick=()=>{if(swapMode){swapSel.has(i)?swapSel.delete(i):swapSel.add(i);}else{if(S.current!==S.yourSeat||botsRunning)return;selRack=(selRack===i?null:i);}render();};
+    r.appendChild(d);});}
+const POUCH_SVG='<svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 9 C6.4 9 9 7.4 12 7.4 C15 7.4 17.6 9 17.6 9 L20 18.6 C20 20.5 16.4 22 12 22 C7.6 22 4 20.5 4 18.6 Z" fill="#c9a24b" stroke="#7a5f24" stroke-width="1"/><path d="M8 8.4 C8 6.1 9.8 4.6 12 4.6 C14.2 4.6 16 6.1 16 8.4" fill="none" stroke="#7a5f24" stroke-width="1.5"/><ellipse cx="12" cy="8.7" rx="6" ry="1.5" fill="#7a5f24" opacity="0.45"/></svg>';
+function renderScores(){const el=document.getElementById('scores'),bg=document.getElementById('bag');
+  if(!S){if(el)el.style.display='none';if(bg)bg.style.display='none';return;}
+  const cur=S.current, over=S.status==='FINISHED';
+  if(el){el.style.display='';
+    el.innerHTML=S.seats.map((se,i)=>{const me=(i===S.yourSeat);const isCur=(i===cur&&!over);
+      return `<div class="row${isCur?' cur':''}"><span class="nm">${isCur?'\u25b8\u00a0':''}${me?'You':esc(se.name)}</span><span><span class="sc">${se.score}</span><span class="tl">${se.handCount}\u25a1</span></span></div>`;}).join('');}
+  if(bg){bg.style.display='';bg.innerHTML=`${POUCH_SVG}<span>${S.bag}</span>`;}}
+function clearIllegal(){document.querySelectorAll('#boardInner .tile.illegal').forEach(t=>t.classList.remove('illegal'));}
+function markIllegal(){const ts=document.querySelectorAll('#boardInner .tile.pending');if(ts.length)ts[ts.length-1].classList.add('illegal');}
+function renderControls(){const fin=S&&S.status==='FINISHED';const myturn=S&&S.current===S.yourSeat&&!botsRunning;
+  const play=document.getElementById('bPlay'),reset=document.getElementById('bReset'),swap=document.getElementById('bSwap');
+  play.classList.remove('flashok','flashturn');reset.classList.remove('flashbad');
+  swap.textContent=swapMode?('Confirm'+(swapSel.size?' ('+swapSel.size+')':'')):'Swap';
+  swap.disabled=!(myturn&&!fin&&S&&S.bag>0);
+  reset.textContent=swapMode?'Cancel':'Reset';reset.disabled=false;
+  if(!myturn||swapMode||fin){play.disabled=true;clearIllegal();return;}
+  const v=validatePending();
+  if(v.empty){ clearIllegal(); if(netGame&&!S.youHaveMove){play.textContent='Pass';play.disabled=false;} else {play.textContent='Play';play.disabled=true;play.classList.add('flashturn');} }
+  else if(v.legal){clearIllegal();play.textContent='Play';play.disabled=false;play.classList.add('flashok');}
+  else{play.textContent='Play';play.disabled=true;reset.classList.add('flashbad');markIllegal();}}
+
+/* ---------- actions ---------- */
+function placeAt(x,y){if(swapMode||!S||S.current!==S.yourSeat||botsRunning)return;
+  const now=Date.now();
+  if(selRack===null){if(!(lastPickWarn&&now-lastPickWarn<600))flash('Pick a tile first.');lastPickWarn=now;return;}
+  if(lastPlace.x===x&&lastPlace.y===y&&now-lastPlace.t<600)return; // dedupe click + pointer-up double fire
+  lastPlace={x,y,t:now};
+  pending.push({x,y,code:S.hand[selRack],rackIdx:selRack});selRack=null;render();}
+function resetOrCancel(){if(swapMode){swapMode=false;swapSel.clear();}else{pending=[];selRack=null;}render();}
+async function playMove(){if(netGame&&pending.length===0&&S&&!S.youHaveMove&&S.current===S.yourSeat)return netPass();
+  if(busy||pending.length===0)return;
+  const v=validatePending();if(!v.legal){flash("That move isn't legal yet.");return;}
+  busy=true;setBarDisabled(true);
+  let thinkMs=0;if(humanTurnStart!==null){thinkMs=Date.now()-humanTurnStart;thinkTimes.push(thinkMs/1000);humanTurnStart=null;}
+  const p=pending.map(p=>`${p.x},${p.y},${p.code}`).join(';');
+  try{const url=netGame?('api/net/game/'+S.id+'/move'):('api/game/'+S.id+'/move');
+    const d=await api(url,'POST',{placements:p,thinkMs});S=d;pending=[];selRack=null;render();
+    if(!netGame){if(d.lastPoints>0)toast(`<span class="pts">+${d.lastPoints}</span> for your move`,1600);
+      if(d.lastQwirkles>0)qwirkleToast('You',d.lastQwirkles);}
+    await showUnlocks(d);busy=false;if(netGame)afterNetTurn(d);else runBots();}
+  catch(e){busy=false;flash(e.message);render();}}
+async function swapAction(){
+  if(busy)return;
+  if(!swapMode){swapMode=true;pending=[];selRack=null;render();return;}
+  const tiles=[...swapSel].map(i=>S.hand[i]).join(',');
+  if(!tiles){swapMode=false;render();return;}
+  busy=true;setBarDisabled(true);
+  let thinkMs=0;if(humanTurnStart!==null){thinkMs=Date.now()-humanTurnStart;thinkTimes.push(thinkMs/1000);humanTurnStart=null;}
+  try{const url=netGame?('api/net/game/'+S.id+'/swap'):('api/game/'+S.id+'/swap');
+    const d=await api(url,'POST',{tiles,thinkMs});S=d;swapMode=false;swapSel.clear();render();
+    if(!netGame)toast(`Swapped ${tiles.split(',').length}`,1400);await showUnlocks(d);busy=false;if(netGame)afterNetTurn(d);else runBots();}
+  catch(e){busy=false;flash(e.message);render();}}
+async function runBots(){if(botsRunning)return;botsRunning=true;render();
+  while(S&&S.status==='IN_PROGRESS'&&S.current!==S.yourSeat){
+    const name=S.seats[S.current].name;
+    toast(`<b>${esc(name)}</b> is thinking…`,1000);
+    await sleep(1100);
+    let d;try{d=await api('api/game/'+S.id+'/advance','POST',{});}catch(e){break;}
+    S=d;render();if(d.lastMove)botToast(d.lastMove);
+    if(d.lastQwirkles>0)qwirkleToast(d.lastScorer||(d.lastMove&&d.lastMove.name)||'',d.lastQwirkles);
+    await sleep(1400);await showUnlocks(d);}
+  botsRunning=false;render();
+  if(S&&S.status==='IN_PROGRESS'&&S.current===S.yourSeat){
+    if(!S.youHaveMove&&S.bag===0){
+      try{const d=await api('api/game/'+S.id+'/pass','POST',{});S=d;if(d.lastMove)botToast(d.lastMove);render();await sleep(1200);return runBots();}catch(e){}
+    } else announceTurn();
+  }
+  maybeGameOver();
+}
+let gameOverShown=false;
+function maybeGameOver(){if(S&&S.status==='FINISHED'&&!gameOverShown){gameOverShown=true;showGameOver();}}
+function showGameOver(){
+  const seats=[...S.seats].sort((a,b)=>b.score-a.score);
+  const top=seats[0].score, winners=seats.filter(s=>s.score===top);
+  const title=winners.length>1?"It's a tie!":`${esc(winners[0].name)} wins!`;
+  const rows=seats.map((s,i)=>`<div class="row"><div class="who">${(i===0&&winners.length===1)?'🏆 ':''}${esc(s.name)} <span class="cap">${s.ai?'bot':'you'}</span></div><div class="big num">${s.score}</div></div>`).join('');
+  const achBtn=(currentUser&&unlockedThisGame>0)?`<button class="ghost" id="goAch">View achievements (${unlockedThisGame})</button>`:'';
+  let prog='';
+  if(S.gameMode==='progressive'){
+    const met=S.levelMet;
+    prog=`<div class="acct" style="text-align:center;border-color:${met?'#3f9d54':'#2c4a40'}">
+      <div style="font-size:16px;font-weight:700;color:${met?'#7fd39a':'var(--fg)'}">${met?`Level ${S.gameLevel} complete!`:`Level ${S.gameLevel} not cleared`}</div>
+      <div class="cap" style="margin-top:4px">${esc(S.levelObjective||'')}</div>
+      ${met?'<div class="cap" style="margin-top:4px;color:var(--accent)">Advanced to the next level.</div>':'<div class="cap" style="margin-top:4px">Try again to climb.</div>'}</div>`;
+  }
+  openModal('Game over',`<div class="winner">${title}</div>${prog}${rows}${achBtn}<button class="start" id="goNew">${S.gameMode==='progressive'?'Continue':'New game'}</button><button class="ghost" id="goDismiss">Dismiss &amp; view board</button>`);
+  document.getElementById('mSub').textContent='Final scores';
+  document.getElementById('goNew').onclick=()=>{gameOverShown=false;showSetup();};
+  document.getElementById('goDismiss').onclick=()=>closeModal();
+  if(currentUser&&unlockedThisGame>0){const b=document.getElementById('goAch');if(b)b.onclick=openAchievements;}
+}
+function announceTurn(){if(!S||S.status!=='IN_PROGRESS'||S.current!==S.yourSeat)return;
+  if(!S.youHaveMove&&S.bag>0)toast('No move available — swap some tiles',1600);
+  else toast('<span class="dot turn"></span> Your move',1400);}
+
+/* ---------- toaster ---------- */
+function toast(html,dur=1700,cls=''){toastQ.push({html,dur,cls});pumpToast();}
+let toastQ=[],toastActive=false;
+async function pumpToast(){if(toastActive)return;toastActive=true;const t=document.getElementById('toast');
+  while(toastQ.length){const m=toastQ.shift();t.innerHTML=m.html;t.className=m.cls?('show '+m.cls):'show';await sleep(m.dur);t.className='';await sleep(160);}
+  toastActive=false;}
+function qwirkleToast(name,count){const cols=['#c74b3f','#d98a3a','#e5c23c','#4a9d5b','#4a78c7','#8b5ea8'];
+  const word='QWIRKLE!';let letters='';for(let i=0;i<word.length;i++)letters+=`<span style="color:${cols[i%cols.length]}">${word[i]}</span>`;
+  const x=count>1?` ×${count}`:'';
+  toast(`<span class="qwletters">${letters}</span>${x}${name?` <span class="cap">${esc(name)}</span>`:''}`,2300,'qwirkle');}
+function setBarDisabled(b){['bPlay','bSwap'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=b;});}
+function botToast(m){let html;
+  if(m.kind==='MOVE')html=`<b>${esc(m.name)}</b> ${miniRow(m.tiles)} <span class="pts">+${m.points}</span>`;
+  else if(m.kind==='SWAP')html=`<b>${esc(m.name)}</b> swapped ${m.tiles.length}`;
+  else html=`<b>${esc(m.name)}</b> passed`;
+  toast(html,1500);}
+async function showUnlocks(d){if(!d||!d.unlocked||!d.unlocked.length)return;
+  unlockedThisGame+=d.unlocked.length;d.unlocked.forEach(x=>lastGameUnlocks.add(x.code));
+  for(const a of d.unlocked){toast(`<span class="ach2">🏆 ${esc(a.name)}</span> <span class="cap">achievement unlocked</span>`);await sleep(1900);}}
+
+/* ---------- modals ---------- */
+function openModal(title,html){document.getElementById('mTitle').textContent=title;document.getElementById('mSub').textContent='';document.getElementById('mBody').innerHTML=html;
+  document.getElementById('mClose').style.display='';
+  document.getElementById('modal').classList.add('on');document.getElementById('viewport').classList.add('blur');updateChrome();}
+function closeModal(){document.getElementById('modal').classList.remove('on');document.getElementById('viewport').classList.remove('blur');updateChrome();}
+function openScores(){if(!S)return;const total=S.seats.reduce((a,s)=>a+s.score,0);
+  let rows=S.seats.map(s=>`<div class="row"><div class="who">${s.index===S.current?'<span class="dot turn"></span>':'<span class="dot"></span>'}<div>${esc(s.name)}<br><span class="cap">${s.ai?('bot · '+s.difficulty):'you'} · ${s.quirkles} Qwirkles</span></div></div><div class="big num">${s.score}</div></div>`).join('');
+  rows+=`<div class="row"><div class="who">Combined score</div><div class="num">${total}</div></div>`;
+  rows+=`<div class="row"><div class="who">Total Qwirkles</div><div class="num">${S.totalQuirkles}</div></div>`;
+  rows+=`<div class="row"><div class="who">Tiles left in bag</div><div class="num">${S.bag}</div></div>`;
+  openModal('Scores',rows);}
+async function openStats(){if(!S)return;
+  const tabs=`<div class="tabbar"><button class="on" data-t="game">This game</button>${currentUser?'<button data-t="you">You</button>':''}</div><div id="statBody"></div>`;
+  openModal('Stats',tabs);
+  const bar=document.querySelector('.tabbar');
+  bar.onclick=e=>{const t=e.target.dataset.t;if(!t)return;[...bar.children].forEach(b=>b.classList.toggle('on',b===e.target));
+    statTab=t;if(t==='game')renderGameStats();else renderYouStats();};
+  statTab='game';renderGameStats();}
+async function renderGameStats(){const el=document.getElementById('statBody');el.innerHTML='<div class="cap">Loading…</div>';
+  try{const d=await api('api/game/'+S.id+'/stats','GET');
+    if(statTab!=='game')return; // a newer tab is showing; don't clobber it
+    const tt=thinkTimes.length?(thinkTimes.reduce((a,b)=>a+b,0)/thinkTimes.length).toFixed(1)+'s':'—';
+    const grid=`<div class="statgrid">
+      <div class="stat"><div class="k">Tiles in bag</div><div class="v">${d.bag}</div></div>
+      <div class="stat"><div class="k">Total Qwirkles</div><div class="v">${d.quirkles}</div></div>
+      <div class="stat"><div class="k">Highest score</div><div class="v">${d.highestScore} <span class="cap">${esc(d.highestScorer)}</span></div></div>
+      <div class="stat"><div class="k">Your avg think</div><div class="v">${tt}</div></div>
+    </div>`;
+    const head='<tr><th>Player</th><th>Score</th><th>Moves</th><th>Avg</th><th>Best</th><th>Tiles</th><th>Q</th><th>Miss</th><th>O/C</th></tr>';
+    const rows=d.seats.map(x=>{const avg=x.moves?(x.movePoints/x.moves).toFixed(1):'0';
+      return `<tr><td>${esc(x.name)}</td><td>${x.score}</td><td>${x.moves}</td><td>${avg}</td><td>${x.best}</td><td>${x.tilesPlaced}</td><td>${x.quirkles}</td><td>${x.missedQwirkles}</td><td>${x.opens}/${x.closes}</td></tr>`;}).join('');
+    el.innerHTML=grid+`<div class="tblwrap"><table class="stbl">${head}${rows}</table></div>
+      <div class="cap" style="margin-top:8px">Avg = points per move · Q = Qwirkles · Miss = missed Qwirkles · O/C = opens/closes.</div>`;
+  }catch(e){el.innerHTML='<div class="err" style="display:block">'+esc(e.message)+'</div>';}}
+async function renderYouStats(){const el=document.getElementById('statBody');el.innerHTML='<div class="cap">Loading…</div>';
+  try{const d=await api('api/user','GET');
+    if(statTab!=='you')return;
+    const s2=d.stats;
+    const lvl=`<div class="statgrid"><div class="stat"><div class="k">Quirkle level</div><div class="v">${s2.level||1}<span class="cap"> / 100</span></div></div>
+      <div class="stat"><div class="k">Achievements</div><div class="v">${d.unlocked}<span class="cap"> / ${d.total}</span></div></div></div>`;
+    const st=`<div class="tblwrap"><table class="stbl">
+      <tr><th>Games</th><th>Wins</th><th>Win %</th><th>Streak</th><th>Best streak</th></tr>
+      <tr><td>${s2.games}</td><td>${s2.wins}</td><td>${s2.winRate}%</td><td>${s2.winStreak}</td><td>${s2.bestStreak}</td></tr>
+      <tr><th>Best game</th><th>Best move</th><th>Tiles</th><th>Qwirkles</th><th>Missed</th></tr>
+      <tr><td>${s2.bestScore}</td><td>${s2.bestMove}</td><td>${s2.tilesPlaced}</td><td>${s2.quirkles}</td><td>${s2.missedQwirkles}</td></tr>
+      </table></div>`;
+    el.innerHTML=lvl+st+`<div class="cap" style="margin-top:10px">Achievements are in the burger menu (☰).</div>`;
+  }catch(e){el.innerHTML='<div class="err" style="display:block">Log in to see your stats.</div>';}}
+async function openAchievements(){
+  if(!currentUser){openModal('Achievements','<div class="cap">Log in to earn and view achievements. You can play as a guest, but progress isn\'t saved.</div>');return;}
+  openModal('Achievements','<div id="achBody"><div class="cap">Loading…</div></div>');
+  try{const d=await api('api/user','GET');
+    document.getElementById('mSub').textContent=`${d.unlocked} / ${d.total} unlocked`;
+    const list=[...d.achievements].sort((x,y)=>(lastGameUnlocks.has(y.code)?1:0)-(lastGameUnlocks.has(x.code)?1:0));
+    const ach=list.map(a=>{const pips='●'.repeat(a.difficulty)+'○'.repeat(5-a.difficulty);
+      const fresh=lastGameUnlocks.has(a.code);
+      const cls='ach'+(a.unlocked?'':' lock')+(a.impl?'':' soon')+(fresh?' fresh':'');
+      const when=a.unlocked&&a.unlockedAt?`<div class="achwhen">Unlocked ${new Date(a.unlockedAt).toLocaleDateString()}</div>`:'';
+      return `<div class="${cls}"><div class="an">${a.unlocked?'🏆 ':''}${esc(a.name)}${fresh?'<span class="newbadge">NEW</span>':''}</div><div class="ad">${esc(a.desc)}</div><div class="pips">${pips}</div>${when}</div>`;}).join('');
+    const hdr=lastGameUnlocks.size?`<div class="cap" style="margin-bottom:8px;color:#7fd39a">${lastGameUnlocks.size} unlocked this game — highlighted below.</div>`:'';
+    const body=document.getElementById('achBody');if(body)body.innerHTML=hdr+`<div class="achgrid">${ach}</div>`;
+  }catch(e){const body=document.getElementById('achBody');if(body)body.innerHTML='<div class="err" style="display:block">Could not load achievements.</div>';}}
+
+function openLog(){if(!S)return;
+  let rows='<div class="logline started"><span class="nm"></span><b>GAME STARTED</b></div>';
+  S.events.forEach(e=>{let mid;
+    if(e.kind==='MOVE')mid=`${miniRow(e.tiles)} <span class="pts">+${e.points}</span>${e.qwirkle?' <span class="qbadge">QWIRKLE</span>':''}`;
+    else if(e.kind==='SWAP')mid=`<span class="cap">swapped ${e.tiles.length}</span>`;
+    else mid=`<span class="cap">passed</span>`;
+    rows+=`<div class="logline"><span class="nm">${esc(e.name)}</span>${mid}</div>`;});
+  openModal('Move log',rows);
+  document.getElementById('mSub').innerHTML=S.status==='FINISHED'
+    ?('<span class="waiting">Game over — '+esc([...S.seats].sort((a,b)=>b.score-a.score)[0].name)+' wins</span>')
+    :('<span class="waiting">Waiting for '+esc(S.seats[S.current].name)+' …</span>');
+  const body=document.getElementById('mBody');body.scrollTop=body.scrollHeight;}
+function quit(){
+  const msg=currentUser
+    ? 'Leave this game? Your progress is saved — you can rejoin it from \u201cMy games\u201d.'
+    : 'Leave this game? Guest games aren\u2019t saved, so this one will be lost.';
+  openModal('Leave game?',`<div class="cap">${msg}</div><button class="start" id="qYes">Leave game</button><button class="ghost" id="qNo">Keep playing</button>`);
+  const y=document.getElementById('qYes'),n=document.getElementById('qNo');
+  if(y)y.onclick=doQuit; if(n)n.onclick=closeModal;
+}
+function doQuit(){closeNetSocket();netGame=false;location.hash='';S=null;pending=[];selRack=null;swapMode=false;botsRunning=false;closeModal();showAuth();}
+function newGameFromMenu(){closeNetSocket();netGame=false;showSetup();}
+async function showAbout(){
+  openModal('About & help','<div id="aboutBody" class="cap">Loading\u2026</div>');
+  try{const d=await api('api/info','GET');
+    const rules=`<h3 class="ab">How to play</h3><p class="cap">Build lines of tiles that share a colour or a shape \u2014 and never repeat a tile within a line. A full line of six is a <b>Qwirkle</b> (double points). You score every tile in each line your move touches. When the bag is empty and a player lays their last tile, the game ends and the highest score wins.</p>`;
+    const bots=`<h3 class="ab">The bots</h3>`+(d.bots||[]).map(b=>`<div class="abrow"><b>${esc(b.name)}</b> \u2014 ${esc(b.blurb)}</div>`).join('');
+    const pip=n=>'<span class="on">'+'\u25cf'.repeat(n)+'</span>'+'\u25cf'.repeat(Math.max(0,5-n));
+    const ach=`<h3 class="ab">Achievements (${(d.achievements||[]).length})</h3>`+(d.achievements||[]).map(a=>`<div class="abrow"><b>${esc(a.name)}</b> <span class="pips">${pip(a.difficulty||1)}</span><div class="cap">${esc(a.desc)}</div></div>`).join('');
+    const body=document.getElementById('aboutBody');if(body){body.className='about';body.innerHTML=rules+bots+ach;}
+  }catch(e){const b=document.getElementById('aboutBody');if(b)b.innerHTML='<div class="err" style="display:block">'+esc(e.message)+'</div>';}
+}
+
+/* ---------- setup ---------- */
+let aiChoice=3,diffChoice='medium';
+const P_OPTS=[['sharp','Sharp — ruthless (hard)'],['steady','Steady — dependable (medium)'],['casual','Casual — misses Qwirkles (easy)'],['spreader','Spreader — opens the board (medium)'],['wily','Wily — strong, occasional slips (hard)']];
+const P_NAMES=['Lexi','Tilly','Bob','Indigo','Edward'], P_KEYS=['sharp','steady','casual','spreader','wily'];
+function pickRoster(n){const idx=[0,1,2,3,4];for(let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]];}
+  return idx.slice(0,n).map(i=>({name:P_NAMES[i],key:P_KEYS[i]}));}
+function personaPickers(){rosterPick=pickRoster(aiChoice);let rows='';
+  rosterPick.forEach((r,i)=>{rows+=`<div class="persona"><span class="pnm">${r.name}</span><select data-bot="${i}">`+
+    P_OPTS.map(o=>`<option value="${o[0]}"${o[0]===r.key?' selected':''}>${o[1]}</option>`).join('')+`</select></div>`;});
+  return `<div class="field" id="personaBox"><label>Bots &amp; personalities</label>${rows}</div>`;}
+function refreshPersonas(){const b=document.getElementById('personaBox');if(b)b.outerHTML=personaPickers();}
+function showModalShell(){document.getElementById('modal').classList.add('on');document.getElementById('viewport').classList.add('blur');updateChrome();}
+function updateChrome(){const inGame=!!S;const modalOn=document.getElementById('modal').classList.contains('on');
+  document.getElementById('burger').classList.toggle('show',inGame&&!modalOn);
+  if(!inGame||modalOn)document.getElementById('menu').classList.remove('on');}
+
+/* ---------- online (correspondence) ---------- */
+async function joinNet(token){try{const r=await api('api/net/join','POST',{token});location.hash='g='+r.gameId;loadNetGame(r.gameId);}catch(e){flash(e.message);showOnline();}}
+function openNetSocket(id){closeNetSocket();
+  try{const proto=location.protocol==='https:'?'wss:':'ws:';const base=location.pathname.replace(/[^/]*$/,'');
+    netWs=new WebSocket(proto+'//'+location.host+base+'ws/game/'+id);netWs._gid=String(id);
+    netWs.onmessage=()=>{if(netGame&&S&&String(S.id)===String(id))refreshNet();};
+    netWs.onclose=()=>{if(netWs&&netWs._gid===String(id)&&netGame&&S&&String(S.id)===String(id))setTimeout(()=>{if(netGame&&S&&String(S.id)===String(id)&&(!netWs||netWs.readyState>1))openNetSocket(id);},3000);};
+    netWs.onerror=()=>{};
+  }catch(e){}}
+function closeNetSocket(){if(netWs){try{netWs.onclose=null;netWs.onmessage=null;netWs.close();}catch(e){}netWs=null;}if(netPoll){clearInterval(netPoll);netPoll=null;}}
+async function refreshNet(){if(!S||busy)return;
+  try{const d=await api('api/net/game/'+S.id,'GET');if(!netGame)return;S=d;afterNetTurn(d);}catch(e){}}
+async function loadNetGame(id){try{const d=await api('api/net/game/'+id,'GET');
+    netGame=true;thinkTimes=[];humanTurnStart=null;gameOverShown=false;unlockedThisGame=0;lastGameUnlocks=new Set();
+    S=d;pending=[];selRack=null;swapMode=false;botsRunning=false;location.hash='g='+id;closeModal();render();fitBoard();
+    openNetSocket(id);netPoll=setInterval(()=>{if(netGame&&S&&!busy)refreshNet();},60000);
+    if(d.status==='FINISHED')maybeGameOver();else afterNetTurn(d,true);
+  }catch(e){flash(e.message);showAuth();}}
+function narrateNewEvents(d){const evs=d.events||[];
+  for(let i=netSeen;i<evs.length;i++){const e=evs[i];const mine=(e.seat===d.yourSeat);const who=mine?'You':esc(e.name);
+    if(e.kind==='MOVE'){ if(e.qwirkle)qwirkleToast(mine?'You':e.name,e.qwCount||1); else if(e.points>0)toast(`${who} <span class="pts">+${e.points}</span>`,1500); }
+    else if(e.kind==='SWAP')toast(`${who} swapped`,1300);
+    else if(e.kind==='PASS')toast(`${who} passed`,1300);
+  }
+  netSeen=evs.length;}
+function afterNetTurn(d,quiet){
+  if(quiet){netSeen=(d.events||[]).length;}else{narrateNewEvents(d);}
+  render();
+  if(d.status==='FINISHED'){maybeGameOver();return;}
+  if(d.current===d.yourSeat)announceTurn();}
+async function netPass(){if(busy)return;busy=true;setBarDisabled(true);
+  try{const d=await api('api/net/game/'+S.id+'/pass','POST',{});S=d;render();busy=false;afterNetTurn(d);}
+  catch(e){busy=false;flash(e.message);render();}}
+async function showOnline(){closeNetSocket();openModal('My games','<div id="netBody"><div class="cap">Loading…</div></div>');
+  document.getElementById('mSub').textContent='Resume a game in progress';
+  try{const d=await api('api/net/mine','GET');
+    const rows=(d.games||[]).map(g=>{const tag=g.status==='FINISHED'?'finished':(g.yourTurn?'your turn':'their turn');
+      const mark=g.status==='FINISHED'?'✓':(g.yourTurn?'▶':'…');
+      const where=(g.kind==='SOLO')?'solo':'online';
+      return `<div class="netrow" data-id="${g.id}" data-kind="${g.kind||'SOLO'}"><div><b>vs ${esc(g.opponents)}</b><div class="cap">${where} · ${tag} · you ${g.yourScore}</div></div><div>${mark}</div></div>`;}).join('')||'<div class="cap">No games in progress — start one below.</div>';
+    const body=document.getElementById('netBody');if(!body)return;
+    body.innerHTML=rows+`<button class="start" id="bNewOnline">New online game</button><button class="ghost" id="bBackOnline">Back</button>`;
+    body.querySelectorAll('.netrow').forEach(r=>r.onclick=()=>{ if(r.dataset.kind==='SOLO') loadGame(r.dataset.id); else loadNetGame(r.dataset.id); });
+    document.getElementById('bNewOnline').onclick=showNewOnline;
+    document.getElementById('bBackOnline').onclick=showAuth;
+  }catch(e){const b=document.getElementById('netBody');if(b)b.innerHTML='<div class="err" style="display:block">'+esc(e.message)+'</div>';}}
+function showNewOnline(){netBots=1;netDiff='medium';
+  openModal('New online game',`<div class="field"><label>Invite players (emails, comma-separated)</label><input id="netEmails" type="text" placeholder="friend@example.com, other@example.com"></div>
+    <div class="field"><label>Bots to fill remaining seats</label><div class="seg" id="segNetBots"><button data-v="0">0</button><button data-v="1" class="on">1</button><button data-v="2">2</button></div></div>
+    <div class="field"><label>Bot difficulty</label><div class="seg" id="segNetDiff"><button data-v="easy">Easy</button><button data-v="medium" class="on">Medium</button><button data-v="hard">Hard</button></div></div>
+    <div class="cap">2–4 players total. Invited players get an email link to join; you can start playing straight away and they can join whenever.</div>
+    <button class="start" id="bCreateOnline">Create &amp; invite</button><button class="ghost" id="bBackNew">Back</button>
+    <div class="err" id="netErr"></div>`);
+  document.getElementById('mSub').textContent='';
+  document.getElementById('segNetBots').onclick=e=>{if(e.target.dataset.v){netBots=+e.target.dataset.v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));}};
+  document.getElementById('segNetDiff').onclick=e=>{if(e.target.dataset.v){netDiff=e.target.dataset.v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));}};
+  document.getElementById('bCreateOnline').onclick=createOnline;
+  document.getElementById('bBackNew').onclick=showOnline;}
+async function createOnline(){const emails=(document.getElementById('netEmails').value||'').trim();
+  if(!emails){const el=document.getElementById('netErr');el.textContent='Add at least one email to invite.';el.style.display='block';return;}
+  try{const d=await api('api/net','POST',{invites:emails,bots:netBots,difficulty:netDiff});
+    netGame=true;gameOverShown=false;unlockedThisGame=0;lastGameUnlocks=new Set();
+    S=d;pending=[];selRack=null;swapMode=false;location.hash='g='+d.id;closeModal();render();fitBoard();openNetSocket(d.id);afterNetTurn(d,true);
+  }catch(e){const el=document.getElementById('netErr');if(el){el.textContent=e.message;el.style.display='block';}}}
+
+/* ---------- landing / auth ---------- */
+function showAuth(){
+  const body=currentUser
+    ? `<div class="acct">Signed in as <b>${esc(currentUser.displayName)}</b></div>
+       <button class="start" id="bContinue">Continue to game</button>
+       <button class="ghost" id="bOnline">My games</button>
+       <button class="ghost" id="bViewStats">View my stats</button>
+       <button class="ghost" id="bLogout2">Log out</button>`
+    : `<div class="field"><label>Email</label><input id="aEmail" type="email" autocomplete="username" placeholder="you@example.com"></div>
+       <div class="field"><label>Password</label><input id="aPass" type="password" autocomplete="current-password" placeholder="••••••"></div>
+       <div class="field" id="nameField" style="display:none"><label>Display name</label><input id="aName" type="text" maxlength="24" placeholder="Name"></div>
+       <div class="authrow"><button id="bLogin">Log in</button><button id="bReg">Register</button></div>
+       <div class="linkrow"><span class="lnk" id="bForgot">Forgot password?</span></div>
+       <button class="ghost" id="bGuest">Continue as guest</button>
+       <div class="err" id="authErr"></div>`;
+  document.getElementById('mTitle').textContent='Quirkle';
+  document.getElementById('mBody').innerHTML=body;
+  document.getElementById('mSub').textContent=currentUser?'':'Log in, reset your password, or play as a guest';
+  document.getElementById('mClose').style.display='none';
+  showModalShell();
+  if(currentUser){
+    document.getElementById('bContinue').onclick=showSetup;
+    document.getElementById('bOnline').onclick=showOnline;
+    document.getElementById('bViewStats').onclick=openUserStats;
+    document.getElementById('bLogout2').onclick=doLogout;
+  }else{
+    document.getElementById('bLogin').onclick=()=>doAuth(false);
+    document.getElementById('bReg').onclick=()=>{const nf=document.getElementById('nameField');
+      if(nf.style.display==='none'){nf.style.display='';document.getElementById('aName').focus();}else doAuth(true);};
+    document.getElementById('bGuest').onclick=()=>{currentUser=null;showSetup();};
+    document.getElementById('bForgot').onclick=showForgot;
+  }
+}
+function showForgot(){
+  document.getElementById('mSub').textContent='Reset your password';
+  document.getElementById('mBody').innerHTML=`
+    <div class="field"><label>Email</label><input id="fEmail" type="email" placeholder="you@example.com"></div>
+    <button class="start" id="bSendReset">Send reset link</button>
+    <button class="ghost" id="bBackAuth">Back</button>
+    <div class="ok" id="fMsg"></div><div class="err" id="fErr"></div>`;
+  document.getElementById('bSendReset').onclick=doForgot;
+  document.getElementById('bBackAuth').onclick=showAuth;
+}
+async function doForgot(){const email=(document.getElementById('fEmail').value||'').trim();
+  const msg=document.getElementById('fMsg'),err=document.getElementById('fErr');msg.style.display='none';err.style.display='none';
+  try{await api('api/auth/forgot','POST',{email});
+    msg.textContent='If that email has an account, a reset link is on its way.';msg.style.display='block';}
+  catch(e){err.textContent=e.message;err.style.display='block';}}
+function showReset(token){
+  document.getElementById('mTitle').textContent='Quirkle';
+  document.getElementById('mSub').textContent='Choose a new password';
+  document.getElementById('mBody').innerHTML=`
+    <div class="field"><label>New password</label><input id="rPass" type="password" placeholder="at least 6 characters"></div>
+    <button class="start" id="bDoReset">Set new password</button>
+    <div class="ok" id="rMsg"></div><div class="err" id="rErr"></div>`;
+  document.getElementById('mClose').style.display='none';
+  showModalShell();
+  document.getElementById('bDoReset').onclick=async()=>{const password=document.getElementById('rPass').value||'';
+    const err=document.getElementById('rErr'),msg=document.getElementById('rMsg');err.style.display='none';msg.style.display='none';
+    try{await api('api/auth/reset','POST',{token,password});
+      msg.textContent='Password updated — you can log in now.';msg.style.display='block';
+      history.replaceState(null,'',location.pathname);
+      setTimeout(async()=>{await fetchMe();showAuth();},1300);}
+    catch(e){err.textContent=e.message;err.style.display='block';}};
+}
+async function openUserStats(){openModal('Your stats','<div id="statBody"><div class="cap">Loading…</div></div>');renderYouStats();}
+
+/* ---------- setup ---------- */
+let gameModeChoice='free', myLevel=1, myObjective='Win a game';
+let allLevels=null, selectedLevel=1;
+async function showSetup(){
+  aiChoice=3;diffChoice='medium';
+  document.getElementById('mTitle').textContent='New game';
+  document.getElementById('mSub').textContent='';
+  document.getElementById('mClose').style.display=S?'':'none';
+  document.getElementById('mBody').innerHTML='<div class="cap">Loading…</div>';
+  showModalShell();
+  if(currentUser){try{const d=await api('api/user','GET');myLevel=d.stats.level||1;myObjective=d.stats.levelObjective||'Win a game';}catch(e){}
+    if(!allLevels){try{allLevels=await api('api/levels','GET');}catch(e){}}
+    selectedLevel=myLevel;}
+  else gameModeChoice='free';
+  renderSetup();
+}
+function renderSetup(){
+  const acct=currentUser
+    ? `<div class="acct">Signed in as <b>${esc(currentUser.displayName)}</b></div>`
+    : `<div class="acct">Playing as <b>guest</b> — log in for Progressive mode, stats &amp; achievements.</div>`;
+  const modeSeg=currentUser?`<div class="field"><label>Mode</label><div class="seg" id="segMode">
+      <button data-v="progressive"${gameModeChoice==='progressive'?' class="on"':''}>Progressive</button>
+      <button data-v="free"${gameModeChoice==='free'?' class="on"':''}>Free play</button>
+      <button data-v="online">Online</button></div></div>`:'';
+  let opts;
+  if(currentUser&&gameModeChoice==='progressive'){
+    if(selectedLevel>myLevel||selectedLevel<1)selectedLevel=myLevel;
+    const info=(allLevels&&allLevels[selectedLevel-1])?allLevels[selectedLevel-1]:{objective:myObjective,bots:''};
+    let optsSel='';for(let i=1;i<=myLevel;i++)optsSel+=`<option value="${i}"${i===selectedLevel?' selected':''}>Level ${i}${i<myLevel?' — replay':''}</option>`;
+    const botTier=info.bots?info.bots.charAt(0).toUpperCase()+info.bots.slice(1):'scaled';
+    opts=`<div class="acct">
+      <div style="font-size:15px;color:var(--fg)">Your level: <b>${myLevel}</b> / 100</div>
+      ${myLevel>1?`<div class="field" style="margin-top:8px;margin-bottom:0"><label>Play level</label><select id="lvlSel" class="lvlsel">${optsSel}</select></div>`:''}
+      <div class="cap" style="margin-top:8px">Objective: ${esc(info.objective)}</div>
+      <div class="cap" style="margin-top:4px">Bots: ${botTier} · meet the objective to advance.</div>
+      ${selectedLevel<myLevel?'<div class="cap" style="margin-top:4px;color:var(--accent)">Replaying an earlier level — your level won\'t change.</div>':''}
+    </div>`;
+  }else{
+    const tune=currentUser?personaPickers()
+      :`<div class="field"><label>Difficulty</label><div class="seg" id="segDiff">
+        <button data-v="easy">Easy</button><button data-v="medium" class="on">Medium</button><button data-v="hard">Hard</button></div></div>`;
+    opts=`<div class="field"><label>Your name</label><input type="text" id="pname" placeholder="${currentUser?esc(currentUser.displayName):'You'}" maxlength="24"></div>
+      <div class="field"><label>Opponents</label><div class="seg" id="segAi">
+        <button data-v="1">1 bot</button><button data-v="2">2 bots</button><button data-v="3" class="on">3 bots</button></div></div>`+tune;
+  }
+  document.getElementById('mBody').innerHTML=acct+modeSeg+opts
+    +`<button class="start" id="bStart">Start game</button><button class="ghost" id="bBackLanding">Back</button><div class="err" id="setupErr"></div>`;
+  const sm=document.getElementById('segMode');if(sm)sm.onclick=e=>{if(e.target.dataset.v==='online'){showOnline();return;}if(e.target.dataset.v){gameModeChoice=e.target.dataset.v;renderSetup();}};
+  const ls=document.getElementById('lvlSel');if(ls)ls.onchange=e=>{selectedLevel=+e.target.value;renderSetup();};
+  const sa=document.getElementById('segAi');if(sa)sa.onclick=e=>{if(e.target.dataset.v){aiChoice=+e.target.dataset.v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));if(currentUser)refreshPersonas();}};
+  const sd=document.getElementById('segDiff');if(sd)sd.onclick=e=>{if(e.target.dataset.v){diffChoice=e.target.dataset.v;[...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));}};
+  document.getElementById('bStart').onclick=startGame;
+  document.getElementById('bBackLanding').onclick=showAuth;
+}
+async function doAuth(register){const email=(document.getElementById('aEmail').value||'').trim();
+  const password=document.getElementById('aPass').value||'';const name=document.getElementById('aName').value||'';
+  const err=document.getElementById('authErr');err.style.display='none';
+  try{const d=await api('api/auth/'+(register?'register':'login'),'POST',register?{email,name,password}:{email,password});
+    currentUser=d.user;if(pendingJoin){const t=pendingJoin;pendingJoin=null;joinNet(t);}else showSetup();}
+  catch(e){err.textContent=e.message;err.style.display='block';}}
+async function doLogout(){try{await api('api/auth/logout','POST',{});}catch(e){}currentUser=null;showAuth();}
+async function startGame(){
+  let body;
+  if(currentUser&&gameModeChoice==='progressive'){body={mode:'progressive',level:selectedLevel};}
+  else{const nameEl=document.getElementById('pname');const name=nameEl?nameEl.value:'';
+    body={aiCount:aiChoice,name};
+    if(currentUser){body.personas=[...document.querySelectorAll('#personaBox select')].map(x=>x.value).join(',');body.names=rosterPick.map(r=>r.name).join(',');}
+    else body.difficulty=diffChoice;}
+  try{const d=await api('api/game','POST',body);
+    closeNetSocket();netGame=false;thinkTimes=[];humanTurnStart=null;gameOverShown=false;unlockedThisGame=0;lastGameUnlocks=new Set();S=d;pending=[];selRack=null;closeModal();render();fitBoard();
+    if(S.starter)toast(`<b>${esc(S.starter.name)}</b> starts — can play ${S.starter.tiles} tile${S.starter.tiles===1?'':'s'}`,2400);
+    if(d.status==='IN_PROGRESS'&&d.current!==d.yourSeat)runBots();else announceTurn();
+  }catch(e){const el=document.getElementById('setupErr');el.textContent=e.message;el.style.display='block';}}
+async function loadGame(id){try{let d=await api('api/game/'+id,'GET');closeNetSocket();netGame=false;thinkTimes=[];humanTurnStart=null;gameOverShown=false;unlockedThisGame=0;lastGameUnlocks=new Set();S=d;pending=[];render();fitBoard();
+    if(d.status==='FINISHED')maybeGameOver();
+    else if(d.current!==d.yourSeat)runBots();else announceTurn();
+  }catch(e){showAuth();}}
+
+/* ---------- helpers ---------- */
+function flash(m){toast(esc(m));}
+function esc(s){return (''+s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- pan / zoom ---------- */
+(function(){const vp=document.getElementById('viewport');let pointers=new Map(),panStart=null,pinch=null,moved=false,suppress=false,lastTap=0;
+  const two=()=>{const a=[...pointers.values()];return [a[0],a[1]];};
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  vp.addEventListener('pointerdown',e=>{vp.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;
+    if(pointers.size===1)panStart={x:e.clientX,y:e.clientY,tx:view.tx,ty:view.ty};
+    else if(pointers.size===2){const[a,b]=two();pinch={d:dist(a,b),mx:(a.x+b.x)/2,my:(a.y+b.y)/2,s:view.s,tx:view.tx,ty:view.ty};panStart=null;}});
+  vp.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pointers.size===2&&pinch){const[a,b]=two();const nd=dist(a,b);let ns=Math.max(.3,Math.min(3,pinch.s*(nd/pinch.d)));
+      view.s=ns;view.tx=pinch.mx-((pinch.mx-pinch.tx)/pinch.s)*ns;view.ty=pinch.my-((pinch.my-pinch.ty)/pinch.s)*ns;applyView();moved=true;}
+    else if(pointers.size===1&&panStart){const dx=e.clientX-panStart.x,dy=e.clientY-panStart.y;if(Math.abs(dx)+Math.abs(dy)>10)moved=true;
+      view.tx=panStart.tx+dx;view.ty=panStart.ty+dy;applyView();}});
+  function up(e){pointers.delete(e.pointerId);if(pointers.size<2)pinch=null;
+    if(pointers.size===1){const p=[...pointers.values()][0];panStart={x:p.x,y:p.y,tx:view.tx,ty:view.ty};}
+    if(pointers.size===0){
+      if(moved){suppress=true;setTimeout(()=>suppress=false,60);}
+      else{
+        // Place directly from the tap position — independent of native click / pointer capture.
+        let slot=null;
+        try{const el=document.elementFromPoint(e.clientX,e.clientY);slot=el&&el.closest?el.closest('.slot'):null;}catch(_){}
+        if(slot&&slot.dataset.x!==undefined){placeAt(+slot.dataset.x,+slot.dataset.y);}
+        else{const now=Date.now();if(now-lastTap<300){fitBoard();}lastTap=now;}
+      }
+    }}
+  vp.addEventListener('pointerup',up);vp.addEventListener('pointercancel',up);
+  vp.addEventListener('click',e=>{if(suppress){e.stopPropagation();e.preventDefault();}},true);
+  vp.addEventListener('wheel',e=>{e.preventDefault();const f=Math.exp(-e.deltaY*0.0015);const ns=Math.max(.3,Math.min(3,view.s*f));
+    view.tx=e.clientX-((e.clientX-view.tx)/view.s)*ns;view.ty=e.clientY-((e.clientY-view.ty)/view.s)*ns;view.s=ns;applyView();},{passive:false});
+})();
+
+/* ---------- wire ---------- */
+document.getElementById('bPlay').onclick=playMove;
+document.getElementById('bSwap').onclick=swapAction;
+document.getElementById('bReset').onclick=resetOrCancel;
+document.getElementById('burger').onclick=e=>{e.stopPropagation();document.getElementById('menu').classList.toggle('on');};
+document.getElementById('menu').onclick=e=>{const a=e.target.dataset.a;if(!a)return;
+  document.getElementById('menu').classList.remove('on');
+  if(a==='log')openLog();else if(a==='scores')openScores();else if(a==='stats')openStats();else if(a==='ach')openAchievements();else if(a==='online')showOnline();else if(a==='new')newGameFromMenu();else if(a==='about')showAbout();else if(a==='quit')quit();};
+document.addEventListener('click',e=>{const m=document.getElementById('menu');
+  if(m.classList.contains('on')&&!m.contains(e.target)&&e.target.id!=='burger')m.classList.remove('on');});
+document.getElementById('mClose').onclick=()=>{if(S)closeModal();else showAuth();};
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal'&&S)closeModal();});
+window.addEventListener('resize',()=>{if(S)applyView();});
+
+async function fetchMe(){try{const d=await api('api/auth/me','GET');currentUser=d.user||null;}catch(e){currentUser=null;}}
+(async()=>{
+  const resetTok=new URLSearchParams(location.search).get('reset');
+  if(resetTok){showReset(resetTok);return;}
+  await fetchMe();
+  const hash=location.hash.replace('#','');
+  if(hash.indexOf('join=')===0){if(currentUser)return joinNet(hash.slice(5));pendingJoin=hash.slice(5);return showAuth();}
+  if(hash.indexOf('g=')===0){if(currentUser)return loadNetGame(hash.slice(2));return showAuth();}
+  if(hash&&/^\d+$/.test(hash)){loadGame(hash);return;}
+  showAuth();
+})();
+</script>
+</body>
+</html>
