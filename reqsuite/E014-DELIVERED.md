@@ -1,32 +1,38 @@
 # E014 — Delivered features
 
-**App version:** 0.20.0 · **Updated:** 2026-08-05
+**App version:** 0.26.0 · **Updated:** 2026-08-06
 
-See also: [Planned](E014-PLANNED.md) · [Board](E014-BOARD.md) · [JSON](E014-board.json)
+## Releases
 
-## Releases (selected)
+| Tag | Highlights | Date |
+|-----|------------|------|
+| v0.19.0 | Client UX (banner 6T, Live Game Stats, Profile, Q counter, menu) | 2026-08-05 |
+| v0.20.0 | Quirklapalooza, IT Nerd, Sprawler; completed games API; delete game | 2026-08-05 |
+| v0.21.0 | Sprawler threshold 32; Only Qwirkler achievement | 2026-08-05 |
+| v0.22.0 | Auto-purge; email verification; Burning Hand; Winter Blues; auth UX | 2026-08-06 |
+| v0.23.0 | About shows version; green game `#id` in My/Completed games | 2026-08-06 |
+| v0.24.0 | Admin level unlock; levels 101–200; spectator; names-only leaderboard | 2026-08-06 |
+| v0.25.0 | **D14-0011** fix — re-apply pattern tiles on load | 2026-08-06 |
+| **v0.26.0** | Dense near-Qwirkle pattern boards (~28–40 tiles, 12 designs) | **2026-08-06** |
 
-| Tag | Name | Date |
-|-----|------|------|
-| v0.15.0 | Network polish | 2026-08-02 |
-| v0.19.0 | Client UX polish | 2026-08-05 |
-| **v0.20.0** | **Achievements + completed games API + delete** | **2026-08-05** |
+## Feature IDs delivered (this wave)
 
-## Newly delivered in v0.20.0
+| ID | Title | Release |
+|----|-------|--------|
+| F14-0065 | Email verification (STARTTLS) | v0.22.0 |
+| F14-0093 | Spectator mode | v0.24.0 |
+| F14-0097 | Leaderboard (display names only) | v0.24.0 |
+| F14-0105 | Achievement: Quirklapalooza | v0.20.0 |
+| F14-0106 | Achievement: IT Nerd | v0.20.0 |
+| F14-0107 | Achievement: Sprawler (threshold 32 in v0.21) | v0.20.0 / v0.21.0 |
+| F14-0108–0117 | Client UX polish | v0.19.0–v0.20.0 |
+| F14-0110 | My Games auto-purge | v0.22.0 |
+| F14-0113 | My Games manual delete | v0.20.0 |
+| F14-0118 | Admin unlock progressive level | v0.24.0 |
+| F14-0119 | Progressive levels 101–200 + patterns | v0.24.0; boards upgraded v0.26.0 |
+| F14-0120 | Achievement: Only Qwirkler | v0.21.0 |
+| F14-0121 | Achievement: Burning Hand | v0.22.0 |
+| F14-0122 | Achievement: Winter Blues | v0.22.0 |
+| (UX) | About version; green game numbers | v0.23.0 |
 
-| ID | Priority | Title | Release |
-|----|----------|-------|--------|
-| F14-0105 | Medium | Achievement: Quirklapalooza (12+ Qwirkles) | **v0.20.0** |
-| F14-0106 | Medium | Achievement: IT Nerd (board ≤ 16×16) | **v0.20.0** |
-| F14-0107 | Medium | Achievement: Sprawler (board > 64 dim) | **v0.20.0** |
-| F14-0113 | Medium | My Games: manual purge / delete | **v0.20.0** |
-| F14-0108 | Low | Banner tile count as “6T” | v0.19.0 (in 0.20 WAR) |
-| F14-0109 | Low | Tighten banner spacing | v0.19.0 |
-| F14-0111 | Low | My Games auto-close on select | v0.19.0 |
-| F14-0112 | Low | My Games timestamps | v0.19.0 / 0.20 API |
-| F14-0114 | Low | Burger New Game at top | v0.19.0 |
-| F14-0115 | Low | Rename Stats → Live Game Stats | v0.19.0 |
-| F14-0116 | Medium | Profile menu item | v0.19.0 |
-| F14-0117 | Low | Total Qwirkles next to bag | v0.19.0 |
-
-Prior implemented features (F14-0031…0087, 0059–0064, etc.) unchanged — see git history and earlier board snapshots.
+Earlier epic items (core game, network phases 1–2, auth base, bots, achievements catalogue, progressive 1–100, etc.) remain delivered from prior releases.

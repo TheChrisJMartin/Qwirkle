@@ -2,6 +2,6 @@
 
 ## Current release
 
-**v0.25.0** — fixes D14-0011 (pattern boards on progressive 101–200 survive load; bots no longer play on pre-populated tiles).
+**v0.26.0** — dense near-Qwirkle pattern boards for progressive levels 101–200.
 
-See [RELEASE-v0.25.0.md](RELEASE-v0.25.0.md).
+See [RELEASE-v0.26.0.md](RELEASE-v0.26.0.md) · ReqSuite [reqsuite/E014-BOARD.md](reqsuite/E014-BOARD.md).
