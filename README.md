@@ -2,6 +2,6 @@
 
 ## Current release
 
-**v0.26.0** — dense near-Qwirkle pattern boards for progressive levels 101–200.
+**v0.27.0** — pattern tiles are free setup tiles; play pool remains 108.
 
-See [RELEASE-v0.26.0.md](RELEASE-v0.26.0.md) · ReqSuite [reqsuite/E014-BOARD.md](reqsuite/E014-BOARD.md).
+See [RELEASE-v0.27.0.md](RELEASE-v0.27.0.md).
