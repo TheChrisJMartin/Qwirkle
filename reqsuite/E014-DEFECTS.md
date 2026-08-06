@@ -1,21 +1,25 @@
 # E014 — Defects
 
-**Updated:** 2026-08-05 · **Active defects: none**
+**Updated:** 2026-08-06
 
-Tracker issue: [#11](https://github.com/TheChrisJMartin/Qwirkle/issues/11)
+## Active
 
-| ID | Priority | Title | Status | Release | GitHub |
-|----|----------|-------|--------|---------|--------|
-| D14-0001 | Critical | Tiles could not be placed on the board | **Resolved** | v0.9.1 | [#1](https://github.com/TheChrisJMartin/Qwirkle/issues/1) |
-| D14-0002 | High | Reset button could stick | **Resolved** | v0.10.0 | [#2](https://github.com/TheChrisJMartin/Qwirkle/issues/2) |
-| D14-0003 | High | Achievements list vanished (async race) | **Resolved** | v0.11.0 | [#3](https://github.com/TheChrisJMartin/Qwirkle/issues/3) |
-| D14-0004 | High | Progressive setup always showed Level 1 | **Resolved** | v0.11.1 | [#4](https://github.com/TheChrisJMartin/Qwirkle/issues/4) |
-| D14-0005 | High | Opening player did not play full opening line | **Resolved** | v0.12.0 | [#5](https://github.com/TheChrisJMartin/Qwirkle/issues/5) |
-| D14-0006 | High | Empty-the-bag not credited | **Resolved** | v0.12.1 | [#6](https://github.com/TheChrisJMartin/Qwirkle/issues/6) |
-| D14-0007 | High | Network Qwirkle toast wrong scorer | **Resolved** | v0.15.0 | [#7](https://github.com/TheChrisJMartin/Qwirkle/issues/7) |
-| D14-0008 | High | Humans no achievements in network games | **Resolved** | v0.15.0 | [#8](https://github.com/TheChrisJMartin/Qwirkle/issues/8) |
-| D14-0009 | High | Turn emails every turn | **Resolved** | v0.15.0 | [#9](https://github.com/TheChrisJMartin/Qwirkle/issues/9) |
-| D14-0010 | Medium | Completed games in active My Games list | **Resolved** (client) | v0.19.0 | [#10](https://github.com/TheChrisJMartin/Qwirkle/issues/10) |
+| ID | Severity | Title | Status | Introduced |
+|----|----------|-------|--------|------------|
+| **D14-0011** | High | Level 101+ — bots play on top of pre-populated pattern tiles | **Open** | v0.24.0 (F14-0119) |
 
-### D14-0010 remaining server work
-Tracked under planned features **F14-0110** (auto-purge) and **F14-0113** (manual delete).
+### D14-0011 — Bots on pre-populated tiles
+
+- **Observed:** Progressive level **101** (pattern board); bots place on cells that already have pre-placed pattern tiles.
+- **Expected:** Occupied cells are illegal for all seats (human and AI).
+- **Scope:** Likely all levels **101–200** that use `LevelPatterns`.
+- **GitHub:** Track as issue *D14-0011: Level 101 — bots play on top of pre-populated pattern tiles*.
+- **Workaround:** Play progressive levels 1–100 only until fixed.
+
+## Resolved (recent)
+
+| ID | Title | Resolved |
+|----|-------|----------|
+| D14-0010 | Completed games still in active My Games list | v0.20.0 |
+
+Earlier defects (D14-0001–0009) remain resolved per prior releases.
