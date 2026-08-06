@@ -2,6 +2,6 @@
 
 ## Current release
 
-**v0.27.0** — pattern tiles are free setup tiles; play pool remains 108.
+**v0.27.1** — AI/LegalMoves bounds for progressive pattern boards (no bot freeze).
 
-See [RELEASE-v0.27.0.md](RELEASE-v0.27.0.md).
+See [RELEASE-v0.27.1.md](RELEASE-v0.27.1.md).
