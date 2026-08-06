@@ -1,14 +1,7 @@
 # Qwirkle
 
-Jakarta WAR + SPA client.
-
 ## Current release
 
-**v0.23.0** — version in About & help; green game numbers in My Games / Completed Games.
+**v0.24.0** — progressive levels 101–200 with patterns, admin level unlock, spectator mode, names-only leaderboard.
 
-See [RELEASE-v0.23.0.md](RELEASE-v0.23.0.md).
-
-## ReqSuite (E014)
-
-- [Planned](reqsuite/E014-PLANNED.md)
-- [v0.23 notes](reqsuite/E014-v0.23.0-NOTES.md)
+See [RELEASE-v0.24.0.md](RELEASE-v0.24.0.md).
